@@ -606,10 +606,10 @@ function initCompare() {
   if (compareReady) return;
   compareReady = true;
 
-  populateSelect(document.getElementById('wfSelectA'), 'all');
+  populateSelect(document.getElementById('wfSelectA'), months.length-2);
   populateSelect(document.getElementById('wfSelectB'), months.length-1);
 
-  wfA = makeWaterfallChart('wfChartA', 'all');
+  wfA = makeWaterfallChart('wfChartA', months.length-2);
   wfB = makeWaterfallChart('wfChartB', months.length-1);
 
   refreshCompare();
