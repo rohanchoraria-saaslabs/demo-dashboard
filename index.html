@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SDR Demo Stage Analysis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter','Helvetica Neue',Arial,sans-serif; background:#FFFFFF; color:#111827; padding:48px; }
+
+    /* ── Page Header ── */
+    .page-eyebrow { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:#9CA3AF; margin-bottom:8px; }
+    .page-header h1 { font-family:'Space Grotesk',sans-serif; font-size:28px; font-weight:700; color:#111827; letter-spacing:-0.03em; }
+    .page-header p  { font-family:'JetBrains Mono',monospace; font-size:12px; color:#6B7280; margin-top:6px; letter-spacing:0.02em; }
+
+    /* ── Tab Bar ── */
+    .tab-bar { display:flex; border-bottom:1px solid #E5E7EB; margin-bottom:32px; }
+    .tab { font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:500; color:#6B7280; padding:10px 18px; cursor:pointer; border:none; background:none; border-bottom:2px solid transparent; margin-bottom:-1px; transition:color .15s; letter-spacing:-0.01em; }
+    .tab:hover { color:#374151; }
+    .tab.active { color:#2563EB; border-bottom-color:#2563EB; font-weight:600; }
+
+    /* ── Hero Bar ── */
+    .hero-bar { background:#111827; border-radius:6px; padding:28px 32px; display:grid; grid-template-columns:repeat(4,1fr); margin-bottom:20px; }
+    .hero-metric { padding-right:28px; border-right:1px solid rgba(255,255,255,0.08); margin-right:28px; }
+    .hero-metric:last-child { border-right:none; margin-right:0; padding-right:0; }
+    .h-label { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.45); margin-bottom:10px; }
+    .h-value { font-family:'JetBrains Mono',monospace; font-size:36px; font-weight:700; letter-spacing:-0.02em; color:#FFFFFF; line-height:1; }
+    .h-sub   { font-family:'JetBrains Mono',monospace; font-size:11px; margin-top:8px; }
+    .up    { color:#16A34A; }
+    .down  { color:#DC2626; }
+    .muted { color:rgba(255,255,255,0.35); }
+
+    /* ── Chart Cards ── */
+    .chart-section { margin-bottom:20px; }
+    .chart-card { background:#FFFFFF; border:1px solid #E5E7EB; border-radius:6px; padding:24px 28px 20px; }
+    .card-title { font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:600; color:#111827; letter-spacing:-0.01em; margin-bottom:4px; }
+    .card-label { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; color:#9CA3AF; margin-bottom:20px; }
+    .card-header { display:flex; align-items:flex-start; justify-content:space-between; }
+    .card-header > div { flex:1; }
+
+    /* ── Selects ── */
+    .wf-select { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; padding:5px 10px; border:1px solid #E5E7EB; border-radius:4px; background:#F9FAFB; color:#374151; cursor:pointer; outline:none; margin-top:2px; flex-shrink:0; }
+    .wf-select:hover { background:#F3F4F6; }
+
+    /* ── Insight Tiles ── */
+    .insights-row { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:24px; padding-top:20px; border-top:1px solid #E5E7EB; }
+    .insight-tile { background:#F9FAFB; border:1px solid #E5E7EB; border-left:3px solid #2563EB; border-radius:0 4px 4px 0; padding:14px 16px; }
+    .insight-tile.positive { border-left-color:#16A34A; }
+    .insight-tile.negative { border-left-color:#DC2626; }
+    .insight-tile.warning  { border-left-color:#D97706; }
+    .i-label { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; color:#9CA3AF; margin-bottom:6px; }
+    .i-value { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; color:#111827; margin-bottom:4px; line-height:1.2; }
+    .i-body  { font-family:'JetBrains Mono',monospace; font-size:11px; color:#6B7280; line-height:1.5; }
+
+    /* ── Compare Layout ── */
+    .compare-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+
+    /* ── Compare Tables ── */
+    .compare-table { width:100%; border-collapse:collapse; margin-top:24px; }
+    .compare-table th { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:#6B7280; background:#F9FAFB; border-bottom:2px solid #E5E7EB; padding:8px 10px; text-align:left; }
+    .compare-table th:not(:first-child) { text-align:right; }
+    .compare-table td { font-family:'JetBrains Mono',monospace; font-size:12px; padding:8px 10px; border-bottom:1px solid #E5E7EB; color:#374151; }
+    .compare-table td:not(:first-child) { text-align:right; font-weight:500; }
+    .compare-table tr:nth-child(even) td { background:#F9FAFB; }
+    .compare-table tr:nth-child(even) td.pct-cell { background:inherit; }
+    .compare-table .total-row td { font-weight:700; color:#111827; background:#FFFFFF !important; border-bottom:2px solid #E5E7EB; }
+    .stage-dot { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:8px; vertical-align:middle; }
+
+    /* ── % Cell conditional formatting ── */
+    .pct-cell.better   { background:#DCFCE7 !important; color:#15803D !important; }
+    .pct-cell.worse    { background:#FEE2E2 !important; color:#B91C1C !important; }
+    .pct-cell.sig-better { background:#BBF7D0 !important; color:#15803D !important; font-weight:700 !important; }
+    .pct-cell.sig-worse  { background:#FECACA !important; color:#B91C1C !important; font-weight:700 !important; }
+
+    /* ── Delta cell ── */
+    .delta-up   { color:#16A34A; font-weight:600; }
+    .delta-down { color:#DC2626; font-weight:600; }
+    .delta-nil  { color:#9CA3AF; }
+
+    /* ── Compare Insights ── */
+    .compare-insights-card { margin-top:20px; }
+    .shifts-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:16px; }
+    .shift-tile { background:#F9FAFB; border:1px solid #E5E7EB; border-radius:4px; padding:12px 14px; }
+    .shift-tile.up   { border-top:2px solid #16A34A; }
+    .shift-tile.down { border-top:2px solid #DC2626; }
+    .shift-tile.sig-up   { border-top:3px solid #16A34A; background:#F0FDF4; }
+    .shift-tile.sig-down { border-top:3px solid #DC2626; background:#FFF5F5; }
+    .st-stage { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; text-transform:uppercase; letter-spacing:0.06em; color:#6B7280; margin-bottom:6px; }
+    .st-delta { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700; line-height:1; margin-bottom:4px; }
+    .st-delta.up   { color:#16A34A; }
+    .st-delta.down { color:#DC2626; }
+    .st-context { font-family:'JetBrains Mono',monospace; font-size:10px; color:#9CA3AF; }
+    .compare-summary { display:flex; gap:20px; flex-wrap:wrap; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid #E5E7EB; }
+    .sum-chip { font-family:'JetBrains Mono',monospace; font-size:12px; color:#374151; background:#F9FAFB; border:1px solid #E5E7EB; border-radius:4px; padding:7px 12px; }
+    .sum-chip strong { font-weight:700; }
+    .sum-chip.pos strong { color:#16A34A; }
+    .sum-chip.neg strong { color:#DC2626; }
+
+    /* ── Source bar ── */
+    .source-bar { border-top:1px solid #E5E7EB; margin-top:48px; padding-top:14px; font-family:'JetBrains Mono',monospace; font-size:11px; color:#9CA3AF; letter-spacing:0.02em; }
+  </style>
+</head>
+<body>
+
+<!-- Page Header -->
+<div class="page-header" style="margin-bottom:28px;">
+  <div class="page-eyebrow">SDR · Demo Analysis</div>
+  <h1>First-Funnel Demo Stage Analysis</h1>
+  <p>Oct 2025 – Mar 2026 · SDR-assigned leads · 6-month view</p>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="compare">Compare Periods</button>
+</div>
+
+<!-- ══ TAB: OVERVIEW ══ -->
+<div id="pane-overview">
+
+  <div class="hero-bar" id="heroBar"></div>
+
+  <!-- Waterfall + Insights -->
+  <div class="chart-section">
+    <div class="chart-card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Demo Breakdown by Outcome Stage</div>
+          <div class="card-label">Stage decomposition · waterfall from total · select month to filter</div>
+        </div>
+        <select id="wfSelectOverview" class="wf-select"></select>
+      </div>
+      <div style="position:relative;height:420px;">
+        <canvas id="waterfallChart"></canvas>
+      </div>
+      <!-- Insights -->
+      <div class="insights-row" id="overviewInsights"></div>
+    </div>
+  </div>
+
+  <!-- Total Demos vs S1 -->
+  <div class="chart-section">
+    <div class="chart-card">
+      <div class="card-title">S1 conversion held between 11–18% despite significant volume swings</div>
+      <div class="card-label">Bars = total demos (left axis) · Line = S1 % of total (right axis) · Oct 2025–Mar 2026</div>
+      <div style="position:relative;height:380px;">
+        <canvas id="stackedBar"></canvas>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ TAB: COMPARE ══ -->
+<div id="pane-compare" style="display:none;">
+  <div class="compare-grid">
+    <!-- LEFT -->
+    <div>
+      <div class="chart-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Period A</div>
+            <div class="card-label" id="labelA">—</div>
+          </div>
+          <select id="wfSelectA" class="wf-select"></select>
+        </div>
+        <div style="position:relative;height:340px;"><canvas id="wfChartA"></canvas></div>
+        <table class="compare-table">
+          <thead><tr><th>Stage</th><th>Count</th><th>% Share</th><th>Δ vs B</th></tr></thead>
+          <tbody id="tableA"></tbody>
+        </table>
+      </div>
+    </div>
+    <!-- RIGHT -->
+    <div>
+      <div class="chart-card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Period B</div>
+            <div class="card-label" id="labelB">—</div>
+          </div>
+          <select id="wfSelectB" class="wf-select"></select>
+        </div>
+        <div style="position:relative;height:340px;"><canvas id="wfChartB"></canvas></div>
+        <table class="compare-table">
+          <thead><tr><th>Stage</th><th>Count</th><th>% Share</th></tr></thead>
+          <tbody id="tableB"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Compare Insights -->
+  <div class="chart-section compare-insights-card" id="compareInsightsSection">
+    <div class="chart-card">
+      <div class="card-title">What Changed Between These Two Periods</div>
+      <div class="card-label">Stage concentration shifts · sorted by magnitude</div>
+      <div id="compareInsights"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="source-bar">Source: HubSpot · SDR Assigned First-Funnel · Generated Apr 2026</div>
+
+<script>
+/* ── Data ─────────────────────────────────────────────────── */
+const months = ['Oct 25','Nov 25','Dec 25','Jan 26','Feb 26','Mar 26'];
+const totals = [978, 862, 681, 1024, 946, 1324];
+
+const stages = [
+  { label: 'S1 (A)',           data: [175,  97,  97, 143, 142, 205], color: '#2563EB' },
+  { label: 'Passed to PS (B)', data: [157,  97,  99, 181, 142, 223], color: '#16A34A' },
+  { label: 'Unqualified (C)',  data: [ 91, 119,  44,  92,  75,  71], color: '#D97706' },
+  { label: 'Disqualified (D)', data: [136, 128,  92, 180, 170, 179], color: '#DC2626' },
+  { label: 'Working (E)',      data: [ 33,  64, 117,  87,  98, 254], color: '#7C3AED' },
+  { label: 'Nurture (F)',      data: [229, 231, 141, 234, 215, 228], color: '#0891B2' },
+  { label: 'Assigned (G)',     data: [  2,   7,  18,  21,  21,  22], color: '#EA580C' },
+  { label: 'Others (H)',       data: [155, 119,  73,  86,  83, 142], color: '#9CA3AF' },
+];
+
+/* ── Chart defaults ──────────────────────────────────────── */
+Chart.defaults.font.family = "'JetBrains Mono','SF Mono',monospace";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = '#6B7280';
+
+const TOOLTIP = {
+  backgroundColor:'#111827',
+  titleFont:{ family:"'JetBrains Mono',monospace", size:11 },
+  bodyFont: { family:"'JetBrains Mono',monospace", size:11 },
+  padding:12,
+};
+
+/* ── Build waterfall dataset ─────────────────────────────── */
+function buildWaterfallData(sel) {
+  let grandTotal, stageValues;
+  if (sel === 'all') {
+    grandTotal  = totals.reduce((a,v)=>a+v, 0);
+    stageValues = stages.map(s=>({ label:s.label, value:s.data.reduce((a,v)=>a+v,0), color:s.color }));
+  } else {
+    const idx   = +sel;
+    grandTotal  = totals[idx];
+    stageValues = stages.map(s=>({ label:s.label, value:s.data[idx], color:s.color }));
+  }
+  const labels=[],floatData=[],colors=[],borderColors=[],valueLabels=[];
+  labels.push('Total'); floatData.push([0,grandTotal]);
+  colors.push('#111827CC'); borderColors.push('#111827'); valueLabels.push(grandTotal);
+  let rem = grandTotal;
+  stageValues.forEach(s=>{
+    labels.push(s.label); floatData.push([rem-s.value, rem]);
+    colors.push(s.color+'CC'); borderColors.push(s.color); valueLabels.push(s.value);
+    rem -= s.value;
+  });
+  return { labels, floatData, colors, borderColors, valueLabels, total:grandTotal };
+}
+
+function selLabel(sel) {
+  return sel==='all' ? 'All months combined · Oct 2025–Mar 2026' : months[+sel];
+}
+function selDisplay(sel) {
+  return sel==='all' ? 'All Months' : months[+sel];
+}
+
+/* ── Waterfall label plugin ──────────────────────────────── */
+const waterfallLabelPlugin = {
+  id:'waterfallLabels',
+  afterDatasetsDraw(chart) {
+    const { ctx, data, chartArea, scales:{ y } } = chart;
+    if (!chart._wfMeta) return;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(chartArea.left,chartArea.top,chartArea.width,chartArea.height); ctx.clip();
+    data.datasets[0].data.forEach((val,i)=>{
+      const meta = chart.getDatasetMeta(0);
+      if (!meta.data[i]) return;
+      const barX = meta.data[i].x;
+      const topY = y.getPixelForValue(Array.isArray(val)?val[1]:val);
+      const v    = chart._wfMeta.valueLabels[i];
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillStyle='#111827'; ctx.font="600 11px 'JetBrains Mono',monospace";
+      ctx.fillText(v.toLocaleString(), barX, topY-18);
+      if (i>0) {
+        ctx.fillStyle='#9CA3AF'; ctx.font="500 10px 'JetBrains Mono',monospace";
+        ctx.fillText(`${((v/chart._wfMeta.total)*100).toFixed(1)}%`, barX, topY-5);
+      }
+    });
+    ctx.restore();
+  }
+};
+
+/* ── Make / update waterfall chart ──────────────────────── */
+function makeWaterfallChart(canvasId, sel) {
+  const d   = buildWaterfallData(sel);
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  const chart = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:d.labels, datasets:[{ data:d.floatData, backgroundColor:d.colors, borderColor:d.borderColors, borderWidth:0, borderRadius:3 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:36 } },
+      plugins:{
+        legend:{ display:false },
+        tooltip:{ ...TOOLTIP, callbacks:{
+          title: ctx=>ctx[0].label,
+          label: ctx=>{ const v=ctx.raw; const val=Array.isArray(v)?v[1]-v[0]:v; const pct=((val/chart._wfMeta.total)*100).toFixed(1); return ` ${val.toLocaleString()} demos  (${pct}%)`; }
+        }}
+      },
+      scales:{
+        x:{ grid:{display:false}, border:{display:false}, ticks:{font:{family:"'JetBrains Mono',monospace",size:11}} },
+        y:{ grid:{color:'#E5E7EB'}, border:{display:false}, ticks:{callback:v=>v.toLocaleString(), font:{family:"'JetBrains Mono',monospace",size:11}}, min:0, max:Math.ceil(d.total*1.25/100)*100 }
+      }
+    },
+    plugins:[waterfallLabelPlugin]
+  });
+  chart._wfMeta = { valueLabels:d.valueLabels, total:d.total };
+  return chart;
+}
+
+function updateWaterfallChart(chart, sel) {
+  const d = buildWaterfallData(sel);
+  chart.data.labels = d.labels;
+  chart.data.datasets[0].data            = d.floatData;
+  chart.data.datasets[0].backgroundColor = d.colors;
+  chart.data.datasets[0].borderColor     = d.borderColors;
+  chart._wfMeta                          = { valueLabels:d.valueLabels, total:d.total };
+  chart.options.scales.y.max             = Math.ceil(d.total*1.25/100)*100;
+  chart.update();
+}
+
+/* ── Populate select ─────────────────────────────────────── */
+function populateSelect(el, defaultSel) {
+  const o = document.createElement('option');
+  o.value='all'; o.textContent='All Months (Total)';
+  if (String(defaultSel)==='all') o.selected=true;
+  el.appendChild(o);
+  months.forEach((m,i)=>{
+    const opt=document.createElement('option');
+    opt.value=i; opt.textContent=m;
+    if (String(i)===String(defaultSel)) opt.selected=true;
+    el.appendChild(opt);
+  });
+}
+
+/* ── Render compare table ────────────────────────────────── */
+function renderTableRight(tbodyId, sel) {
+  const d = buildWaterfallData(sel);
+  let html = `<tr class="total-row">
+    <td><span class="stage-dot" style="background:#111827"></span>Total</td>
+    <td>${d.total.toLocaleString()}</td><td>100.0%</td></tr>`;
+  stages.forEach((s,i)=>{
+    const count = d.valueLabels[i+1];
+    const pct   = (count/d.total*100).toFixed(1);
+    html += `<tr><td><span class="stage-dot" style="background:${s.color}"></span>${s.label}</td>
+      <td>${count.toLocaleString()}</td><td>${pct}%</td></tr>`;
+  });
+  document.getElementById(tbodyId).innerHTML = html;
+}
+
+function renderTableLeft(tbodyId, selA, selB) {
+  const dA = buildWaterfallData(selA);
+  const dB = buildWaterfallData(selB);
+  let html = `<tr class="total-row">
+    <td><span class="stage-dot" style="background:#111827"></span>Total</td>
+    <td>${dA.total.toLocaleString()}</td><td>100.0%</td><td class="delta-nil">—</td></tr>`;
+  stages.forEach((s,i)=>{
+    const countA = dA.valueLabels[i+1];
+    const countB = dB.valueLabels[i+1];
+    const pctA   = countA/dA.total*100;
+    const pctB   = countB/dB.total*100;
+    const delta  = pctA - pctB;
+    const absDelta = Math.abs(delta);
+
+    let pctClass = '';
+    if      (delta >  5) pctClass = 'sig-better';
+    else if (delta >  0) pctClass = 'better';
+    else if (delta < -5) pctClass = 'sig-worse';
+    else if (delta <  0) pctClass = 'worse';
+
+    let deltaHtml;
+    if (absDelta < 0.1) {
+      deltaHtml = `<span class="delta-nil">—</span>`;
+    } else {
+      const dir   = delta > 0 ? '▲' : '▼';
+      const cls   = delta > 0 ? 'delta-up' : 'delta-down';
+      deltaHtml   = `<span class="${cls}">${dir} ${absDelta.toFixed(1)}pp</span>`;
+    }
+
+    html += `<tr>
+      <td><span class="stage-dot" style="background:${s.color}"></span>${s.label}</td>
+      <td>${countA.toLocaleString()}</td>
+      <td class="pct-cell ${pctClass}">${pctA.toFixed(1)}%</td>
+      <td>${deltaHtml}</td></tr>`;
+  });
+  document.getElementById(tbodyId).innerHTML = html;
+}
+
+/* ── Overview Insights ───────────────────────────────────── */
+function renderOverviewInsights(sel) {
+  const container = document.getElementById('overviewInsights');
+
+  // Compute stats for selected period
+  let total, stageVals;
+  if (sel === 'all') {
+    total     = totals.reduce((a,v)=>a+v, 0);
+    stageVals = stages.map(s=>s.data.reduce((a,v)=>a+v, 0));
+  } else {
+    const idx = +sel;
+    total     = totals[idx];
+    stageVals = stages.map(s=>s.data[idx]);
+  }
+
+  const avgTotal   = totals.reduce((a,v)=>a+v,0) / totals.length;
+  const s1Count    = stageVals[0];
+  const s1Pct      = s1Count/total*100;
+  const avgS1Pct   = stages[0].data.reduce((a,v,i)=>a+(v/totals[i]*100), 0) / totals.length;
+
+  // Stage concentration — find most over-represented vs average
+  const stageAvgs  = stages.map(s => s.data.reduce((a,v,i)=>a+(v/totals[i]*100),0)/totals.length);
+  const stagePcts  = stages.map((s,i) => stageVals[i]/total*100);
+  const diffs      = stagePcts.map((p,i)=>({ label:stages[i].label, color:stages[i].color, diff:p-stageAvgs[i], pct:p }));
+  const topDiff    = [...diffs].sort((a,b)=>Math.abs(b.diff)-Math.abs(a.diff))[0];
+  const dominant   = [...stagePcts.entries()].sort((a,b)=>b[1]-a[1])[0];
+
+  // Tile 1: Volume context
+  let tile1Class = 'positive', tile1Value, tile1Body;
+  if (sel === 'all') {
+    tile1Value = total.toLocaleString();
+    tile1Body  = `Avg ${Math.round(avgTotal).toLocaleString()} demos/month across the period.`;
+    tile1Class = 'positive';
+  } else {
+    const idx      = +sel;
+    const vsAvg    = ((total-avgTotal)/avgTotal*100).toFixed(1);
+    tile1Value     = total.toLocaleString();
+    tile1Class     = total>=avgTotal ? 'positive' : 'negative';
+    tile1Body      = `${total>=avgTotal?'▲':'▼'} ${Math.abs(vsAvg)}% vs 6-month avg of ${Math.round(avgTotal).toLocaleString()}.`;
+    if (idx>0) {
+      const mom = ((totals[idx]-totals[idx-1])/totals[idx-1]*100).toFixed(1);
+      tile1Body += ` ${+mom>=0?'▲':'▼'} ${Math.abs(mom)}% MoM vs ${months[idx-1]}.`;
+    }
+  }
+
+  // Tile 2: S1 rate
+  const s1Diff   = (s1Pct-avgS1Pct).toFixed(1);
+  const tile2Class = s1Pct>=avgS1Pct ? 'positive' : 'warning';
+  const tile2Value = `${s1Pct.toFixed(1)}%`;
+  const tile2Body  = `S1 rate ${s1Pct>=avgS1Pct?'▲ above':'▼ below'} 6-mo avg of ${avgS1Pct.toFixed(1)}% by ${Math.abs(s1Diff)}pp. ${s1Count.toLocaleString()} S1 meetings.`;
+
+  // Tile 3: Notable stage
+  const tile3Class = Math.abs(topDiff.diff)>3 ? (topDiff.diff>0?'warning':'positive') : 'positive';
+  const tile3Value = `${topDiff.pct.toFixed(1)}%`;
+  const tile3Body  = `${topDiff.label} is ${Math.abs(topDiff.diff).toFixed(1)}pp ${topDiff.diff>0?'above':'below'} its 6-mo avg concentration of ${(topDiff.pct-topDiff.diff).toFixed(1)}%. Dominant stage: ${stages[dominant[0]].label} at ${dominant[1].toFixed(1)}%.`;
+
+  container.innerHTML = [
+    { cls:tile1Class, label:'Total Volume',     value:tile1Value, body:tile1Body },
+    { cls:tile2Class, label:'S1 Conversion',    value:tile2Value, body:tile2Body },
+    { cls:tile3Class, label:'Stage Outlier',    value:tile3Value, body:tile3Body },
+  ].map(t=>`<div class="insight-tile ${t.cls}">
+    <div class="i-label">${t.label}</div>
+    <div class="i-value">${t.value}</div>
+    <div class="i-body">${t.body}</div>
+  </div>`).join('');
+}
+
+/* ── Compare Insights ────────────────────────────────────── */
+function renderCompareInsights(selA, selB) {
+  const dA = buildWaterfallData(selA);
+  const dB = buildWaterfallData(selB);
+  const container = document.getElementById('compareInsights');
+
+  const volDelta   = dA.total - dB.total;
+  const volPct     = (volDelta/dB.total*100).toFixed(1);
+  const s1A        = (dA.valueLabels[1]/dA.total*100);
+  const s1B        = (dB.valueLabels[1]/dB.total*100);
+  const s1Delta    = (s1A - s1B).toFixed(1);
+
+  // Compute pp shift per stage
+  const shifts = stages.map((s,i)=>({
+    label:  s.label,
+    color:  s.color,
+    pctA:   dA.valueLabels[i+1]/dA.total*100,
+    pctB:   dB.valueLabels[i+1]/dB.total*100,
+    delta:  dA.valueLabels[i+1]/dA.total*100 - dB.valueLabels[i+1]/dB.total*100,
+    countA: dA.valueLabels[i+1],
+    countB: dB.valueLabels[i+1],
+  })).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+
+  // Summary chips
+  const volDir   = volDelta >= 0 ? 'pos' : 'neg';
+  const s1Dir    = +s1Delta >= 0 ? 'pos' : 'neg';
+  const summaryHTML = `<div class="compare-summary">
+    <div class="sum-chip ${volDir}">Volume: Period A had <strong>${volDelta>=0?'+':''}${volPct}%</strong> demos vs B &nbsp;(${dA.total.toLocaleString()} vs ${dB.total.toLocaleString()})</div>
+    <div class="sum-chip ${s1Dir}">S1 Rate: <strong>${+s1Delta>=0?'+':''}${s1Delta}pp</strong> in A vs B &nbsp;(${s1A.toFixed(1)}% vs ${s1B.toFixed(1)}%)</div>
+  </div>`;
+
+  // Top stage shifts (show all 8, sorted)
+  const tilesHTML = `<div class="shifts-grid">${
+    shifts.map(s=>{
+      const absDelta = Math.abs(s.delta);
+      const cls = s.delta>5?'sig-up': s.delta>0?'up': s.delta<-5?'sig-down':'down';
+      const dir = s.delta>=0?'▲':'▼';
+      const badge = absDelta>5 ? ` <span style="font-size:9px;background:${s.delta>0?'#DCFCE7':'#FEE2E2'};color:${s.delta>0?'#15803D':'#B91C1C'};padding:1px 5px;border-radius:3px;font-weight:700;">SIGNIFICANT</span>` : '';
+      return `<div class="shift-tile ${cls}">
+        <div class="st-stage" style="color:${s.color}">${s.label}</div>
+        <div class="st-delta ${s.delta>=0?'up':'down'}">${dir} ${absDelta.toFixed(1)}pp${badge}</div>
+        <div class="st-context">${s.pctA.toFixed(1)}% → ${s.pctB.toFixed(1)}%</div>
+        <div class="st-context" style="margin-top:3px">${s.countA.toLocaleString()} → ${s.countB.toLocaleString()}</div>
+      </div>`;
+    }).join('')
+  }</div>`;
+
+  container.innerHTML = summaryHTML + tilesHTML;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   OVERVIEW TAB
+   ═══════════════════════════════════════════════════════════ */
+
+/* Hero Bar */
+const maxIdx = totals.indexOf(Math.max(...totals));
+const minIdx = totals.indexOf(Math.min(...totals));
+const mom    = ((totals[5]-totals[4])/totals[4]*100).toFixed(1);
+const s1Mar  = stages[0].data[5];
+const s1Pct  = (s1Mar/totals[5]*100).toFixed(1);
+
+document.getElementById('heroBar').innerHTML = [
+  { label:'Mar 26 Demos', value:totals[5].toLocaleString(), sub:`<span class="${+mom>=0?'up':'down'}">${+mom>=0?'▲':'▼'} ${Math.abs(mom)}% vs Feb</span>` },
+  { label:'Mar 26 S1',    value:s1Mar.toLocaleString(),     sub:`<span class="up">${s1Pct}% conversion</span>` },
+  { label:'Peak Month',   value:months[maxIdx],             sub:`<span class="muted">${totals[maxIdx].toLocaleString()} demos</span>` },
+  { label:'Lowest Month', value:months[minIdx],             sub:`<span class="muted">${totals[minIdx].toLocaleString()} demos</span>` },
+].map(m=>`<div class="hero-metric"><div class="h-label">${m.label}</div><div class="h-value">${m.value}</div><div class="h-sub">${m.sub}</div></div>`).join('');
+
+/* Overview waterfall */
+const wfSelOverview = document.getElementById('wfSelectOverview');
+populateSelect(wfSelOverview, months.length-1);
+const wfOverview = makeWaterfallChart('waterfallChart', months.length-1);
+renderOverviewInsights(String(months.length-1));
+
+wfSelOverview.addEventListener('change', function() {
+  updateWaterfallChart(wfOverview, this.value);
+  renderOverviewInsights(this.value);
+});
+
+/* Total Demos vs S1 Rate */
+const stackedCtx = document.getElementById('stackedBar').getContext('2d');
+const s1PctData  = stages[0].data.map((v,i)=>+((v/totals[i])*100).toFixed(1));
+const yLeftMax   = Math.ceil(Math.max(...totals)*1.25/100)*100;
+const yRightMax  = Math.ceil(Math.max(...s1PctData)*1.35);
+
+const dualAxisLabelPlugin = {
+  id:'dualAxisLabels',
+  afterDatasetsDraw(chart) {
+    const { ctx, data, chartArea } = chart;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(chartArea.left,chartArea.top,chartArea.width,chartArea.height); ctx.clip();
+    data.datasets[1].data.forEach((val,i)=>{
+      const meta=chart.getDatasetMeta(1); if (!meta.data[i]) return;
+      const pt=meta.data[i];
+      ctx.fillStyle='#2563EB'; ctx.font="600 11px 'JetBrains Mono',monospace";
+      ctx.textAlign='center'; ctx.textBaseline='bottom';
+      ctx.fillText(`${val}%`, pt.x, pt.y-7);
+    });
+    ctx.restore();
+  }
+};
+
+new Chart(stackedCtx, {
+  data:{ labels:months, datasets:[
+    { type:'bar',  label:'Total Demos',   data:totals,    backgroundColor:'#11182714', borderColor:'#111827', borderWidth:1, borderRadius:3, yAxisID:'yLeft',  order:2 },
+    { type:'line', label:'S1 % of Total', data:s1PctData, borderColor:'#2563EB', backgroundColor:'#2563EB18', borderWidth:2, pointBackgroundColor:'#2563EB', pointRadius:4, pointHoverRadius:6, tension:0.35, yAxisID:'yRight', order:1 }
+  ]},
+  options:{
+    responsive:true, maintainAspectRatio:false, layout:{ padding:{ top:32 } },
+    interaction:{ mode:'index', intersect:false },
+    plugins:{
+      legend:{ display:false },
+      tooltip:{ ...TOOLTIP, callbacks:{ label:ctx=>ctx.datasetIndex===0?` Total Demos: ${ctx.parsed.y.toLocaleString()}`:` S1: ${stages[0].data[ctx.dataIndex].toLocaleString()} (${ctx.parsed.y}%)` }}
+    },
+    scales:{
+      x:      { grid:{display:false}, border:{display:false}, ticks:{font:{family:"'JetBrains Mono',monospace",size:11}} },
+      yLeft:  { grid:{color:'#E5E7EB'}, border:{display:false}, ticks:{callback:v=>v.toLocaleString(), font:{family:"'JetBrains Mono',monospace",size:11}}, position:'left',  min:0, max:yLeftMax },
+      yRight: { grid:{display:false},   border:{display:false}, ticks:{callback:v=>v+'%',              font:{family:"'JetBrains Mono',monospace",size:11}}, position:'right', min:0, max:yRightMax }
+    }
+  },
+  plugins:[dualAxisLabelPlugin]
+});
+
+/* ═══════════════════════════════════════════════════════════
+   COMPARE TAB — lazy init
+   ═══════════════════════════════════════════════════════════ */
+let compareReady = false;
+let wfA, wfB;
+
+function refreshCompare() {
+  const selA = document.getElementById('wfSelectA').value;
+  const selB = document.getElementById('wfSelectB').value;
+  document.getElementById('labelA').textContent = selLabel(selA).toLowerCase();
+  document.getElementById('labelB').textContent = selLabel(selB).toLowerCase();
+  renderTableLeft('tableA', selA, selB);
+  renderTableRight('tableB', selB);
+  renderCompareInsights(selA, selB);
+}
+
+function initCompare() {
+  if (compareReady) return;
+  compareReady = true;
+
+  populateSelect(document.getElementById('wfSelectA'), 'all');
+  populateSelect(document.getElementById('wfSelectB'), months.length-1);
+
+  wfA = makeWaterfallChart('wfChartA', 'all');
+  wfB = makeWaterfallChart('wfChartB', months.length-1);
+
+  refreshCompare();
+
+  document.getElementById('wfSelectA').addEventListener('change', function() {
+    updateWaterfallChart(wfA, this.value); refreshCompare();
+  });
+  document.getElementById('wfSelectB').addEventListener('change', function() {
+    updateWaterfallChart(wfB, this.value); refreshCompare();
+  });
+}
+
+/* ── Tab switching ───────────────────────────────────────── */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    this.classList.add('active');
+    const target = this.dataset.tab;
+    document.getElementById('pane-overview').style.display = target==='overview' ? '' : 'none';
+    document.getElementById('pane-compare').style.display  = target==='compare'  ? '' : 'none';
+    if (target==='compare') {
+      initCompare();
+      setTimeout(()=>{ wfA.resize(); wfB.resize(); }, 50);
+    }
+  });
+});
+</script>
+</body>
+</html>
